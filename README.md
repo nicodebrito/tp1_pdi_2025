@@ -33,11 +33,11 @@ pip install opencv-contrib-Python
 ## Instrucciones de ejecución
 ### Ejercicio 1
 
-```
+
 Para ejecutar el codigo correspondiente a la resolucion del ejercicio 1 se debe correr el script ejercicio1.py
-```
+
 ### Ejercicio 2
 
-```
+
 Para ejecutar el codigo correspondiente a la resolucion del ejercicio 2 se debe correr el script ejercicio2.py
-```
+
