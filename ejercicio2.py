@@ -125,8 +125,6 @@ def validar_imagen(imagen):
     lineas_verticales = agrupar_lineas(lineas_verticales_raw, distancia_minima = 2)
     lineas_horizontales = agrupar_lineas(lineas_horizontales_raw, distancia_minima = 1)
 
-    campos = [] 
-
     validadores = {
         1: ("nombre_y_apellido", valida_nombre),
         2: ("edad", valida_edad),
