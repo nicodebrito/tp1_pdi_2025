@@ -58,7 +58,7 @@ def valida_comentario(cant_caracteres, cant_palabras):  #Comentarios: Debe conte
 def cuenta_elementos(campo):
     
     # Umbralamos para que nos quede imagen binaria y bien marcadas las letras
-    imagen_umbralada = campo < 190 
+    imagen_umbralada = campo < 180 
     # Casteo a uint8 para poder usar connectedComponentsWithStats()
     imagen_umbralada = imagen_umbralada.astype(np.uint8)
     # Detectar componentes conectadas
@@ -104,7 +104,7 @@ def validar_imagen(imagen):
     
     #imagen = imagenes[2]
     # Detectar lo que no es blanco
-    no_blanco = imagen < 190
+    no_blanco = imagen < 180
     no_blanco_uint8 = no_blanco.astype(np.uint8)
     #plt.imshow(no_blanco_uint8, cmap='gray')
     #plt.show()
@@ -236,15 +236,97 @@ def generar_csv(ids, validaciones, ruta_salida="detalle_validacion.csv"):
 
     print("Archivo CSV generado")
 
+def detecta_tipo_formulario(imagen):
 
+    imagen_umbralada = imagen < 190
+    imagen_umbralada_uint8 = imagen_umbralada.astype(np.uint8)
+    #plt.imshow(no_blanco_uint8, cmap='gray')
+    #plt.show()
+    # Suma por filas y columnas
+    enc_cols = np.sum(imagen_umbralada_uint8, axis=0)
+    enc_rows = np.sum(imagen_umbralada_uint8, axis=1)
+    # Umbrales. Lo obtuvimos de manera experimental, mirando valores de la matriz.
+    umbral_vertical = 180
+    umbral_horizontal = 913
+    # Detección de líneas (sin agrupar)
+    lineas_verticales_raw = np.where(enc_cols > umbral_vertical)[0]
+    lineas_horizontales_raw = np.where(enc_rows > umbral_horizontal)[0]
+    # Agrupar líneas cercanas
+    lineas_verticales = agrupar_lineas(lineas_verticales_raw, distancia_minima = 2)
+    lineas_horizontales = agrupar_lineas(lineas_horizontales_raw, distancia_minima = 1)
+
+    #Uso limites verticales desde el segundo hasta el final
+    x_ini = lineas_verticales[1]
+    x_fin = lineas_verticales[-1]
+
+    #Uso limites verticales dependiendo el campo que voy a validar
+    y_ini = lineas_horizontales[0]
+    y_fin = lineas_horizontales[1]
+
+    #Recorto el campo en cuestion
+    campo = imagen_umbralada_uint8[y_ini:y_fin, x_ini:x_fin]
+    campo = campo[5:-5,5:-5] 
+
+    #plt.imshow(campo, cmap='gray')
+    #plt.show()
+
+    componentes = cv2.connectedComponentsWithStats(campo, 8, cv2.CV_32S) 
+    estadisticas = componentes[2]
+    #Cestadisticas es una matriz con una fila por cada componente conectada detectada en la imagen.
+    #Formato de fila: x,y,width,height,area
+    #Los elementos se detectan en cualquier orden, por ende deberias ordenarlos bajo algun criterios para validarlos en su correcto orden
+    #Ordenamos las filas en orden ascendente de acuerdo al elemento 0 (coordenadas eje x) de cada subarray
+    indices_ordenados = np.argsort(estadisticas[:, 0])
+    estadisticas = estadisticas[indices_ordenados]
+    
+    #El primer elemento siempre es el fondo, lo descartamos
+    estadisticas = estadisticas[1:]
+    
+
+    #Para cada elemento detectado busco el elemento que se ecuentra despues del espacio
+    for i in range(len(estadisticas)-1):
+        if ( estadisticas[i+1][0] - (estadisticas[i][0] + estadisticas[i][2]) ) > 8:
+                indice= i+1
+
+    # Extraer los valores de la fila correspondiente
+    x = int(estadisticas[indice, 0])  # coordenada X
+    y = int(estadisticas[indice, 1])  # coordenada Y
+    w = int(estadisticas[indice, 2])  # ancho
+    h = int(estadisticas[indice, 3])  # alto
+
+    # Recortar la region correspondiente a la letra de tipo de formulario
+    recorte_letra = campo[y-1:y+1+h, x-1:x+1+w]
+    #plt.imshow(recorte, cmap='gray')
+    #plt.show()
+
+    #Detecto contornos
+    contours, hierarchy = cv2.findContours(recorte_letra, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    hierarchy = hierarchy[0]  # matriz Nx4: [Next, Previous, FirstChild, Parent]
+
+    #Detecto huecos
+    num_huecos = sum(1 for h in hierarchy if h[3] == 0)
+
+    # Segun cantidad de huecos asigno letras
+    if num_huecos == 2:
+        letra = "B"
+    elif num_huecos == 1:
+        letra = "A"
+    else:
+        letra = "C"
+    
+    return letra
+
+    
 
 def generar_validaciones(ids, imagenes):
     validaciones=[]
     for id,img in zip(ids,imagenes):
-        print("Imagen ID:", id)
         validacion = validar_imagen(img)
         validaciones.append(validacion)
         estado_formulario = estado_validacion(validacion)
+        tipo_formulario = detecta_tipo_formulario(img)
+        print("Imagen ID:", id)
+        print("Tipo de formulario:", tipo_formulario)
         print("Estado:", estado_formulario)
         print("\nDetalle:")
         for campo in validacion:
